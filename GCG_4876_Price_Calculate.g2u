@@ -1,0 +1,116 @@
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'BN, Jan 12, 2017
+'This project will populate the Weight field (from Inventory_MST.LBS) and calculate the unit Price on the Sales Order Line and Quick Quote Line Screen based on the formula: Price = Weight * (Info 1) / 100
+'Info 1 label will be named as "CWT"
+f.Intrinsic.Control.Try
+v.Local.sError.Declare(String)
+
+F.ODBC.Connection!con.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+
+F.Intrinsic.Control.SelectCase(V.Caller.hook)
+
+	'Populate - Quote line Screen
+	F.Intrinsic.Control.Case(10260)
+		Variable.Passed.000201.Set("Calculate")
+		Variable.Passed.000186.Set("CWT")
+		
+	'Script 1 button - Quote line Screen
+	F.Intrinsic.Control.Case(10670)
+		f.Intrinsic.Control.CallSub("Calculate")
+		
+	'Populate - Order line Screen	
+	F.Intrinsic.Control.Case(12010)	
+		Variable.Passed.000162.Set("Calculate")
+		Variable.Passed.000185.Set("CWT")
+		
+	'Script 1 button - Order line Screen	
+	F.Intrinsic.Control.Case(12410)
+		f.Intrinsic.Control.CallSub("Calculate")
+		
+F.Intrinsic.Control.EndSelect
+
+F.ODBC.Connection!con.Close
+
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.Catch
+	Function.Intrinsic.String.Concat("Subroutine Error",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.End 
+F.Intrinsic.Control.EndTry
+
+Program.Sub.Main.End
+
+Program.Sub.Calculate.Start
+f.Intrinsic.Control.Try
+v.Local..BulkDeclareString(sPart,sSQL,sRet)
+v.Local..BulkDeclareFloat(fHold,fWeight,fPrice,fQuantityOrd)
+v.Local.bNumeric.Declare(boolean)
+
+'Both screen Quote Line and Order Line have the same following passed variables:
+	'Variable.Passed.000052: Part
+	'Variable.Passed.000053: Rev
+	'Variable.Passed.000054: Locn
+	'Variable.Passed.000016: Weight
+	'Variable.Passed.000028: Info 1
+	'Variable.Passed.000009: Price
+	
+'Generate complete Part number
+
+
+'no longer getting weight from Inventory Master 3/5/2019, if no weight entered prompt user.
+F.Intrinsic.Control.If(V.Passed.000016.Trim,=,"")
+	F.Intrinsic.UI.Msgbox("A Weight needs to be entered first.","Attention")
+	F.Intrinsic.Control.End
+F.Intrinsic.Control.EndIf
+'f.Intrinsic.String.GSSPartString(Variable.Passed.000052,Variable.Passed.000053,v.Local.sPart)
+'Set Weight
+'f.Intrinsic.String.Build("Select LBS from Inventory_Mst2 where part = '{0}' and Location = '{1}'",v.Local.sPart,Variable.Passed.000054,v.Local.sSQL)
+'f.ODBC.Connection!con.ExecuteAndReturn(v.Local.sSQL,v.Local.fWeight)
+'Variable.Passed.000016.Set(v.Local.fWeight)
+v.Local.fWeight.Set(V.Passed.000016)
+
+'Calculate: Price = Weight * (Info 1) / 100
+f.Intrinsic.Math.IsNumeric(Variable.Passed.000028,v.Local.bNumeric)
+f.Intrinsic.Control.If(v.Local.bNumeric,=,True)
+	f.Intrinsic.Math.Div(Variable.Passed.000028,100,v.Local.fHold)
+	'making sure weight is for a single piece
+	
+	F.Intrinsic.Math.IsNumeric(V.Passed.000007,V.Local.bNumeric)
+	
+	F.Intrinsic.Control.If(V.Local.bNumeric,=,True)
+		V.Local.fQuantityOrd.Set(V.Passed.000007)
+		
+		F.Intrinsic.Control.If(V.Local.fQuantityOrd,<>,0)
+			F.Intrinsic.Math.Div(V.Local.fWeight,V.Passed.000007,V.Local.fWeight)
+			f.Intrinsic.Math.Mult(v.Local.fWeight,v.Local.fHold,v.local.fPrice)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.UI.Msgbox("Please enter an Order Qty greater than 0.")
+			F.Intrinsic.Control.End
+		F.Intrinsic.Control.EndIf
+		
+	F.Intrinsic.Control.Else
+		F.Intrinsic.UI.Msgbox("Please enter a valid Order Qty")
+		F.Intrinsic.Control.End
+	F.Intrinsic.Control.EndIf
+	
+	
+f.Intrinsic.Control.Else
+	f.Intrinsic.UI.Msgbox("Info 1 must be numeric","Invalid data")
+	F.Intrinsic.Control.End
+f.Intrinsic.Control.EndIf
+f.Intrinsic.Math.Round(v.Local.fPrice,2,v.Local.fPrice)
+v.passed.000009.Set(v.Local.fPrice)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Catch
+	Function.Intrinsic.String.Concat("Subroutine Error",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.End 
+F.Intrinsic.Control.EndTry
+
+Program.Sub.Calculate.End
